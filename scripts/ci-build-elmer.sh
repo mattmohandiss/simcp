@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-revision=$(node -e 'const lock=JSON.parse(require("node:fs").readFileSync("flake.lock")); const input=lock.nodes.root.inputs.elmer; console.log(lock.nodes[input].locked.rev)')
+revision=${ELMER_REVISION:?ELMER_REVISION must be set from flake.lock}
 temp_dir="$RUNNER_TEMP"
 workspace="$GITHUB_WORKSPACE"
 if command -v cygpath >/dev/null 2>&1; then

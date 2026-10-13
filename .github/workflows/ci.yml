@@ -37,6 +37,13 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+      - name: Read pinned Elmer revision
+        id: elmer-revision
+        shell: bash
+        run: |
+          revision=$(node -e 'const lock=JSON.parse(require("node:fs").readFileSync("flake.lock")); const input=lock.nodes.root.inputs.elmer; console.log(lock.nodes[input].locked.rev)')
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
       - name: Install Linux runtime build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y gfortran cmake ninja-build libopenblas-dev liblapack-dev libtbb-dev libglu1-mesa libgl1 libxrender1 libxcursor1 libxfixes3 libxext6 libxft2 libfontconfig1 libxinerama1 libx11-6
@@ -101,11 +108,15 @@ jobs:
       - name: Build pinned Elmer runtime on cache miss
         if: steps.elmer-cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
         shell: bash
+        env:
+          ELMER_REVISION: ${{ steps.elmer-revision.outputs.revision }}
         run: bash scripts/ci-build-elmer.sh
 
       - name: Build pinned Elmer runtime on Windows cache miss
         if: steps.elmer-cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
         shell: msys2 {0}
+        env:
+          ELMER_REVISION: ${{ steps.elmer-revision.outputs.revision }}
         run: bash scripts/ci-build-elmer.sh
 
       - name: Add Elmer to PATH
