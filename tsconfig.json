@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "module": "nodenext", "lib": ["ESNext"],
+    "types": ["node"], "rootDir": ".", "outDir": "dist",
+    "strict": true, "skipLibCheck": true, "resolveJsonModule": true,
+    "declaration": true, "sourceMap": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

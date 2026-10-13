@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArtifactRef",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["revision", "format"],
+  "properties": {
+    "revision": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "uri": { "type": "string", "format": "uri" },
+    "format": {
+      "type": "string",
+      "enum": [
+        "step",
+        "gmsh-msh",
+        "elmer-mesh",
+        "vtu",
+        "elmer-sif",
+        "text",
+        "json"
+      ]
+    },
+    "units": {
+      "type": "string",
+      "description": "UCUM spatial unit when applicable."
+    }
+  }
+}
