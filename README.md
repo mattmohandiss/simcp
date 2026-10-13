@@ -15,8 +15,9 @@ passed locally. This is local runtime evidence, not verification of every target
 Distribution targets match Geometry MCP: Windows x64, macOS ARM64 (Apple
 Silicon), and Linux x64. Intel macOS, Linux ARM64, and Windows ARM64 are outside
 the target matrix. CI runs unit/artifact/process checks on these three targets;
-full solver integration currently runs only on Linux x64. Bundled cross-platform
-solver runtimes are still under development.
+CI is being extended to build the pinned serial Elmer solver on each target,
+cache the native install, and run the analytic thermal integration test. This
+validates native execution but does not yet publish a standalone runtime package.
 
 The repository owns its artifact schema in `contracts/`. Builds bundle that
 schema and the Python worker; Gmsh and Elmer runtimes are installed separately.

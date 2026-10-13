@@ -36,9 +36,100 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
-      - uses: cachix/install-nix-action@v31
-        if: matrix.name == 'Linux x64'
+
+      - name: Install Linux runtime build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gfortran cmake ninja-build libopenblas-dev liblapack-dev libtbb-dev libglu1-mesa libgl1 libxrender1 libxcursor1 libxfixes3 libxext6 libxft2 libfontconfig1 libxinerama1 libx11-6
+
+      - name: Install macOS runtime build dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install gcc openblas tbb ninja
+          compiler=$(node -e 'const fs=require("node:fs"); const p=process.argv[1]; const names=fs.readdirSync(p).filter(n=>/^gfortran-\\d+$/.test(n)).sort((a,b)=>Number(a.slice(9))-Number(b.slice(9))); console.log(names.length ? p+"/"+names.at(-1) : "")' "$(brew --prefix gcc)/bin")
+          test -n "$compiler"
+          echo "FC=$compiler" >> "$GITHUB_ENV"
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix openblas):$(brew --prefix tbb)" >> "$GITHUB_ENV"
+
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix develop -c just integration
-        if: matrix.name == 'Linux x64'
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-openblas
+            mingw-w64-ucrt-x86_64-tbb
+
+      - name: Fingerprint native runtime toolchain
+        id: runtime-toolchain
+        shell: bash
+        run: |
+          {
+            cmake --version | head -1
+            "${FC:-gfortran}" --version | head -1
+            pkg-config --modversion openblas || echo openblas-version-unknown
+            pkg-config --modversion tbb || echo tbb-version-unknown
+          } | tee "$RUNNER_TEMP/runtime-toolchain.txt"
+          echo "fingerprint=$(sha256sum "$RUNNER_TEMP/runtime-toolchain.txt" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore native Elmer runtime cache
+        id: elmer-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .runtime-cache/elmer
+          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint }}
+
+      - name: Build pinned Elmer runtime on cache miss
+        if: steps.elmer-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          rev=$(node -e 'const l=JSON.parse(require("fs").readFileSync("flake.lock")); const id=l.nodes.root.inputs.elmer; console.log(l.nodes[id].locked.rev)')
+          temp_dir="$RUNNER_TEMP"
+          workspace="$GITHUB_WORKSPACE"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            temp_dir=$(cygpath -u "$temp_dir")
+            workspace=$(cygpath -u "$workspace")
+          fi
+          git clone --filter=blob:none https://github.com/ElmerCSC/elmerfem.git "$temp_dir/elmer-source"
+          git -C "$temp_dir/elmer-source" checkout "$rev"
+          git -C "$temp_dir/elmer-source" submodule update --init --recursive
+          bash scripts/build-elmer.sh "$temp_dir/elmer-source" "$workspace/.runtime-cache/elmer"
+
+      - name: Add Elmer to PATH
+        shell: bash
+        run: echo "$GITHUB_WORKSPACE/.runtime-cache/elmer/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: scripts/runtime-requirements.txt
+
+      - name: Install Gmsh runtime wheel
+        run: python -m pip install --no-deps -r scripts/runtime-requirements.txt
+
+      - name: Run full analytic thermal smoke test
+        env:
+          SIMULATION_PYTHON: python
+          SIMULATION_ELMERGRID: ${{ runner.os == 'Windows' && format('{0}/.runtime-cache/elmer/bin/ElmerGrid.exe', github.workspace) || format('{0}/.runtime-cache/elmer/bin/ElmerGrid', github.workspace) }}
+          SIMULATION_ELMERSOLVER: ${{ runner.os == 'Windows' && format('{0}/.runtime-cache/elmer/bin/ElmerSolver.exe', github.workspace) || format('{0}/.runtime-cache/elmer/bin/ElmerSolver', github.workspace) }}
+        run: npm run test:integration
+
+      - name: Save native Elmer runtime cache
+        if: steps.elmer-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .runtime-cache/elmer
+          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint }}
+
+      - name: Upload tested native Elmer runtime
+        uses: actions/upload-artifact@v7
+        with:
+          name: simulation-elmer-${{ runner.os }}-${{ runner.arch }}
+          path: .runtime-cache/elmer
+          if-no-files-found: error
+          retention-days: 7
