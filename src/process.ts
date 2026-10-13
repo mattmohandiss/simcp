@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { open } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -12,6 +12,18 @@ export function controlledEnvironment(): NodeJS.ProcessEnv {
   for (const name of ['HOME', 'PATH', 'PYTHONPATH', 'LD_LIBRARY_PATH', 'ELMER_HOME', 'ELMER_LIB']) if (process.env[name]) env[name] = process.env[name];
   return env;
 }
+function terminateTree(child: ChildProcess, force = false): void {
+  if (!child.pid) return;
+  if (process.platform === 'win32') {
+    // taskkill /T includes descendants; avoid shell interpretation of the PID.
+    const args = ['/PID', String(child.pid), '/T'];
+    if (force) args.push('/F');
+    const killer = spawn('taskkill', args, { shell: false, stdio: 'ignore', windowsHide: true });
+    killer.on('error', () => { try { child.kill(force ? 'SIGKILL' : 'SIGTERM'); } catch { /* already exited */ } });
+    return;
+  }
+  try { process.kill(-child.pid, force ? 'SIGKILL' : 'SIGTERM'); } catch { /* process group already gone */ }
+}
 export async function runProcess(executable: string, args: string[], cwd: string, prefix: string, timeoutMs: number, signal?: AbortSignal, maxOutputBytes = 8 * 1024 * 1024): Promise<ProcessResult> {
   const stdoutFile = await open(join(cwd, `${prefix}.stdout`), 'wx', 0o600);
   const stderrFile = await open(join(cwd, `${prefix}.stderr`), 'wx', 0o600);
@@ -19,16 +31,13 @@ export async function runProcess(executable: string, args: string[], cwd: string
   let status: ProcessResult['status'] = 'exited';
   let size = 0, stdout = '', stderr = '';
   let writes = Promise.resolve();
-  const child = spawn(executable, args, { cwd, env: controlledEnvironment(), shell: false, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(executable, args, { cwd, env: controlledEnvironment(), shell: false, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let killTimer: NodeJS.Timeout | undefined;
   const kill = (reason: ProcessResult['status']) => {
     if (status !== 'exited') return;
     status = reason;
-    const send = (sig: NodeJS.Signals) => {
-      try { if (child.pid) process.kill(-child.pid, sig); } catch { /* process already exited */ }
-    };
-    send('SIGTERM');
-    killTimer = setTimeout(() => send('SIGKILL'), 1000);
+    terminateTree(child);
+    killTimer = setTimeout(() => terminateTree(child, true), 1000);
   };
   const timer = setTimeout(() => kill('timeout'), timeoutMs);
   const abort = () => kill('cancelled');
@@ -48,7 +57,7 @@ export async function runProcess(executable: string, args: string[], cwd: string
   try {
     const result = await new Promise<{ exitCode: number | null; signal: string | null }>(done => child.once('close', (exitCode, sig) => done({ exitCode, signal: sig })));
     if (status !== 'exited' && child.pid) {
-      try { process.kill(-child.pid, 'SIGKILL'); } catch { /* process group already gone */ }
+      terminateTree(child, true);
     }
     await writes;
     return { ...result, status, startedAt, endedAt: new Date().toISOString(), stdout, stderr };
