@@ -58,6 +58,7 @@ jobs:
           install: >-
             git
             mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-gcc-fortran
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-pkgconf
@@ -95,7 +96,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .runtime-cache/elmer
-          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/ci.yml', 'flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint || steps.runtime-toolchain-windows.outputs.fingerprint }}
+          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint || steps.runtime-toolchain-windows.outputs.fingerprint }}
 
       - name: Build pinned Elmer runtime on cache miss
         if: steps.elmer-cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
@@ -132,7 +133,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .runtime-cache/elmer
-          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/ci.yml', 'flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint || steps.runtime-toolchain-windows.outputs.fingerprint }}
+          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint || steps.runtime-toolchain-windows.outputs.fingerprint }}
 
       - name: Upload tested native Elmer runtime
         uses: actions/upload-artifact@v7
