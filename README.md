@@ -13,7 +13,8 @@ tests passed. This is local runtime evidence, not verification of every target p
 ## Install and launch
 
 The repository owns its artifact schema in `contracts/`. Builds bundle that
-schema and the Python worker; native Gmsh and Elmer runtimes are installed separately.
+schema, the Python worker, and native rooted-snapshot helpers for the five
+Geometry OS/CPU targets; Gmsh and Elmer runtimes are installed separately.
 
 From this directory:
 
@@ -32,10 +33,15 @@ just start
 pins nixpkgs (and thus Gmsh) by commit, and pins upstream Elmer by commit.
 Elmer's transitive inputs use its checked-in lock.
 
-Supported security platform: Linux (`/proc/self/fd` containment checks).
-Nix targets x86_64-linux and aarch64-linux; not every target has been validated.
+Artifact snapshots use Go `os.Root` and are enabled on Linux and macOS. Windows
+workspace ACL verification is not implemented yet, so server startup remains
+fail-closed there. The Windows snapshot helper is cross-built/tested but is not
+yet wired into a supported Windows server configuration.
+Nix provisions the solver toolchain only on x86_64-linux and aarch64-linux.
+The cross-platform native helper is built into the npm artifact for Linux x64/ARM64,
+macOS x64/ARM64, and Windows x64; this does not imply native solver support on all targets.
 `packages.<system>.toolchain` provisions Node, Gmsh, the Python wrapper and
-upstream Elmer. The dev shell also provisions Python, Ruff and Nix tooling;
+upstream Elmer. The dev shell also provisions Go, Python, Ruff and Nix tooling;
 TypeScript language server/formatter/linter/test deps are project-local npm
 dependencies. Gmsh's Python module lives under its Nix package's `lib`, supplied
 through `PYTHONPATH`. Elmer is an external package, not compiled by npm.

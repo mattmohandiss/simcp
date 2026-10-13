@@ -39,23 +39,16 @@ jobs:
           cache-dependency-path: native/snapshot/go.mod
       - uses: astral-sh/setup-uv@v10.3.0
       - run: npm ci --ignore-scripts
+      - run: npm run build
       - run: uvx ruff check worker
       - run: npm run typecheck
       - run: npm run lint
       - run: npx vitest run tests/process.test.ts
       - run: go test ./...
         working-directory: native/snapshot
-
-  linux-solver-integration:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
+        if: matrix.name == 'Linux x64'
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: nix develop .#checks -c just setup
       - run: nix develop -c just integration
+        if: matrix.name == 'Linux x64'

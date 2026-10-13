@@ -12,8 +12,14 @@ import (
 )
 
 type request struct {
-	Path  string   `json:"path"`
-	Roots []string `json:"roots"`
+	Path  string     `json:"path"`
+	Roots []rootSpec `json:"roots"`
+}
+
+type rootSpec struct {
+	Path   string `json:"path"`
+	Device string `json:"device,omitempty"`
+	Inode  string `json:"inode,omitempty"`
 }
 
 type policyError string
@@ -30,15 +36,28 @@ func beneath(root, path string) (string, bool) {
 
 // snapshot opens only through an os.Root capability and reads the opened file
 // twice. A timeout in the Node caller bounds opens of raced special files.
-func snapshot(path string, roots []string) ([]byte, error) {
-	for _, rootPath := range roots {
-		rel, ok := beneath(rootPath, path)
+func snapshot(path string, roots []rootSpec) ([]byte, error) {
+	return snapshotWithHook(path, roots, nil)
+}
+
+func snapshotWithHook(path string, roots []rootSpec, beforeOpen func()) ([]byte, error) {
+	for _, spec := range roots {
+		rel, ok := beneath(spec.Path, path)
 		if !ok {
 			continue
 		}
-		root, err := os.OpenRoot(rootPath)
+		pathInfo, err := os.Stat(spec.Path)
+		if err != nil || !sameRoot(pathInfo, spec) {
+			return nil, errors.New("stale_artifact: allowed root changed")
+		}
+		root, err := os.OpenRoot(spec.Path)
 		if err != nil {
 			return nil, fmt.Errorf("path_policy: cannot open allowed root: %w", err)
+		}
+		rootInfo, err := root.Stat(".")
+		if err != nil || !sameRoot(rootInfo, spec) {
+			root.Close()
+			return nil, errors.New("stale_artifact: allowed root changed while opening")
 		}
 		beforePath, err := root.Stat(rel)
 		if err != nil {
@@ -48,6 +67,9 @@ func snapshot(path string, roots []string) ([]byte, error) {
 		if !beforePath.Mode().IsRegular() {
 			root.Close()
 			return nil, errors.New("path_policy: artifact must be a regular file")
+		}
+		if beforeOpen != nil {
+			beforeOpen()
 		}
 		file, err := root.Open(rel)
 		if err != nil {
@@ -82,11 +104,25 @@ func snapshot(path string, roots []string) ([]byte, error) {
 	return nil, errors.New("path_policy: artifact is outside allowed roots")
 }
 
+func sameRoot(info os.FileInfo, spec rootSpec) bool {
+	if spec.Device == "" && spec.Inode == "" {
+		return true
+	}
+	device, inode, err := fileIdentity(info)
+	return err == nil && device == spec.Device && inode == spec.Inode
+}
+
 func main() {
 	var req request
 	if err := json.NewDecoder(os.Stdin).Decode(&req); err != nil || req.Path == "" || len(req.Roots) == 0 {
 		fmt.Fprintln(os.Stderr, "invalid_input: expected path and nonempty roots")
 		os.Exit(2)
+	}
+	for _, root := range req.Roots {
+		if root.Path == "" || (root.Device == "") != (root.Inode == "") {
+			fmt.Fprintln(os.Stderr, "invalid_input: root identity must include device and inode")
+			os.Exit(2)
+		}
 	}
 	data, err := snapshot(req.Path, req.Roots)
 	if err != nil {

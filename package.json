@@ -12,6 +12,7 @@
   "files": [
     "dist/src",
     "dist/contracts",
+    "dist/native",
     "dist/worker/*.py",
     "!dist/**/*.map",
     "README.md",
@@ -19,8 +20,10 @@
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "rm -rf dist && tsc && node scripts/copy-assets.mjs",
+    "build": "rm -rf dist && tsc && node scripts/copy-assets.mjs && node scripts/build-native.mjs",
     "prepack": "npm run build",
+    "pretest": "node scripts/build-native.mjs --host-only",
+    "pretest:integration": "node scripts/build-native.mjs --host-only",
     "start": "node dist/src/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit.test.ts tests/security.test.ts tests/process.test.ts",
