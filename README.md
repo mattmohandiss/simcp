@@ -22,7 +22,7 @@ nix develop
 just setup
 just build
 export SIMULATION_INPUT_ROOTS='["/absolute/path/to/models"]'
-export SIMULATION_WORKSPACE=/absolute/path/to/private/run-workspace
+export SIMULATION_WORKSPACE=/absolute/path/to/run-workspace
 just start
 ```
 
@@ -34,7 +34,9 @@ Elmer's transitive inputs use its checked-in lock.
 
 Nix provisions the solver toolchain only on x86_64-linux and aarch64-linux.
 `packages.<system>.toolchain` provisions Node, Gmsh, the Python wrapper and
-upstream Elmer. The dev shell also provisions Python, Ruff and Nix tooling;
+headless upstream Elmer built serially without MPI, OpenMP, ElmerIce or Lua. The analytic
+thermal benchmark passes with that serial solver. The dev shell also provisions
+Python, Ruff and Nix tooling;
 TypeScript language server/formatter/linter/test deps are project-local npm
 dependencies. Gmsh's Python module lives under its Nix package's `lib`, supplied
 through `PYTHONPATH`. Elmer is an external package, not compiled by npm.
@@ -47,7 +49,7 @@ library plus `ElmerGrid` and `ElmerSolver` with `HeatSolve`, `FluxSolver`,
 | ------------------------ | ---------------------------------------------------- |
 | `SIMULATION_INPUT_ROOTS` | Required JSON array of existing absolute input roots |
 | `SIMULATION_WORKSPACE`   | `.simulation-runs`; local run/artifact storage      |
-| `SIMULATION_PYTHON`      | `python3`; Nix sets its provisioned wrapper          |
+| `SIMULATION_PYTHON`      | `python3` (Windows: `python`); Nix sets its wrapper  |
 | `SIMULATION_ELMERGRID`   | `ElmerGrid`                                          |
 | `SIMULATION_ELMERSOLVER` | `ElmerSolver`                                        |
 | `SIMULATION_TIMEOUT_MS`  | 120000 per worker/conversion/solve; maximum 3600000  |
@@ -61,7 +63,7 @@ the Nix shell):
   "args": ["/absolute/path/to/simulation/dist/src/index.js"],
   "env": {
     "SIMULATION_INPUT_ROOTS": "[\"/absolute/path/to/models\"]",
-    "SIMULATION_WORKSPACE": "/absolute/path/to/private/run-workspace",
+    "SIMULATION_WORKSPACE": "/absolute/path/to/run-workspace",
     "SIMULATION_PYTHON": "/absolute/path/to/provisioned/simulation-python",
     "SIMULATION_ELMERGRID": "/absolute/path/to/ElmerGrid",
     "SIMULATION_ELMERSOLVER": "/absolute/path/to/ElmerSolver"
@@ -148,9 +150,9 @@ metadata rather than disguising partial outputs as successful results.
 - Artifact revisions are SHA-256 digests of the exact bytes read or produced.
   Reusing a ref after its file changes fails explicitly, but concurrent edits
   during an operation are not defended against.
-- Processes use configured executables and argument arrays, no shell; only
-  HOME/PATH/PYTHONPATH/library/Elmer paths are inherited, plus fixed locale/thread
-  settings. No secrets or general application environment is forwarded.
+- Processes use configured executables and argument arrays, no shell. The local
+  process environment is inherited for runtime compatibility, with deterministic
+  locale/thread settings applied; child tools therefore also inherit local env vars.
 - Per-process wall timeout, serial execution and 8 MiB combined captured-output
   bound are enforced. There is no portable memory, mesh-size, input-size or
   workspace-disk quota; provision OS quotas/cgroups if deployment needs them.
@@ -214,8 +216,7 @@ In a source checkout, `tests/fixtures/README.md` documents analytic bar dimensio
 generation, and temperature/heat-flux tolerances. Unit checks do not require a
 solver runtime. Native integration checks additionally cover malformed inputs,
 solver failures, timeout/cancellation, restart persistence, and stale outputs.
-Tests retain
-isolated `/tmp/opencode/simulation-test-*` workspaces for evidence;
+Tests use the operating system's temporary directory;
 `SIMULATION_TEST_TMP` can select another temporary root.
 
 Licensing and upstream source references are recorded in

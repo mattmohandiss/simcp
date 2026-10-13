@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mkdir, symlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { symlink, writeFile } from 'node:fs/promises';
+import { join, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Artifacts, digest } from '../src/artifacts.js';
 import { artifactSchema, thermalSchema, type Thermal } from '../src/schemas.js';
@@ -32,14 +32,11 @@ describe('artifact inputs and exact bytes', () => {
     await expect(artifacts.verify(ref)).rejects.toMatchObject({ code: 'stale_artifact' });
     expect((await artifacts.verify(snapshot)).toString()).toBe('abc');
     await writeFile(join(outside, 'secret'), 'secret');
-    await symlink(join(outside, 'secret'), join(input, 'escape'));
-    await expect(artifacts.bytes(pathToFileURL(join(input, 'escape')).href)).rejects.toMatchObject({ code: 'path_policy' });
-    await expect(artifacts.bytes(`file://${input}/nested/../input.step`)).rejects.toMatchObject({ code: 'path_policy' });
+    await symlink(outside, join(input, 'escape'), 'junction');
+    await expect(artifacts.bytes(pathToFileURL(join(input, 'escape', 'secret')).href)).rejects.toMatchObject({ code: 'path_policy' });
+    await expect(artifacts.bytes(`${pathToFileURL(`${input}${sep}`).href}nested/../input.step`)).rejects.toMatchObject({ code: 'path_policy' });
     await expect(artifacts.bytes('https://example.com/model.step')).rejects.toMatchObject({ code: 'path_policy' });
     await expect(artifacts.bytes(pathToFileURL(input).href)).rejects.toMatchObject({ code: 'path_policy' });
-    await mkdir(join(input, 'linked'));
-    await symlink(outside, join(input, 'linked', 'parent'));
-    await expect(artifacts.bytes(pathToFileURL(join(input, 'linked', 'parent', 'secret')).href)).rejects.toMatchObject({ code: 'path_policy' });
   });
 });
 

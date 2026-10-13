@@ -11,7 +11,14 @@
       toolsFor = system:
         let pkgs = nixpkgs.legacyPackages.${system}; in {
           inherit pkgs;
-          solver = elmer.packages.${system}.default;
+          solver = elmer.packages.${system}.default.overrideAttrs (old: {
+            cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+              "-DWITH_MPI:BOOL=OFF"
+              "-DWITH_OpenMP:BOOL=OFF"
+              "-DWITH_ElmerIce:BOOL=OFF"
+              "-DWITH_LUA:BOOL=OFF"
+            ];
+          });
           python = pkgs.writeShellScriptBin "simulation-python" ''
             export PYTHONPATH="${pkgs.gmsh}/lib''${PYTHONPATH:+:$PYTHONPATH}"
             exec ${pkgs.python3}/bin/python3 "$@"

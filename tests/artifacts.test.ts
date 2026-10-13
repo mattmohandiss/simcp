@@ -16,7 +16,7 @@ it('limits inputs to configured local roots', async () => {
 
   const nested = join(root, 'nested');
   await mkdir(nested);
-  await symlink(outside, join(nested, 'escape'));
+  await symlink(outside, join(nested, 'escape'), 'junction');
   await expect(artifacts.bytes(pathToFileURL(join(nested, 'escape', 'secret.step')).href)).rejects.toMatchObject({ code: 'path_policy' });
   await expect(artifacts.bytes(pathToFileURL(root).href)).rejects.toMatchObject({ code: 'path_policy' });
 });

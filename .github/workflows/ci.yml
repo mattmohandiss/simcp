@@ -39,7 +39,7 @@ jobs:
       - run: uvx ruff check worker
       - run: npm run typecheck
       - run: npm run lint
-      - run: npx vitest run tests/process.test.ts
+      - run: npm test
       - uses: cachix/install-nix-action@v31
         if: matrix.name == 'Linux x64'
         with:

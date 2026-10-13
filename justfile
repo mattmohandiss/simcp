@@ -39,4 +39,4 @@ check: typecheck lint test
 
 # Removing run evidence is deliberately not part of clean/build/setup.
 clean:
-    rm -rf dist
+    node scripts/clean-dist.mjs

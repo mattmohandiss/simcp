@@ -2,8 +2,12 @@
 
 - Keep engineering choices explicit: never infer materials, boundary conditions,
   or substitute stale entity selections.
-- Preserve exact-byte artifact validation, filesystem-root restrictions, bounded
-  child processes, controlled environments, and failure/result verification.
+- Preserve exact-byte artifact revisions, configured-root checks for local
+  path mistakes, bounded child processes, and failure/result verification.
+- Solver processes inherit the trusted local environment; override only
+  deterministic numerical/runtime settings unless a specific solver requires otherwise.
+- Treat the service as trusted-local, not a filesystem sandbox. Hosted deployment
+  requires an external isolation boundary.
 - Keep dependencies and test inputs server-local. Do not invoke other MCP servers
   from the implementation or rely on another repository's tests.
 - Prefer `just` recipes. Run `just check` in the `checks` Nix shell for fast

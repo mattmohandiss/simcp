@@ -1,19 +1,20 @@
 import { mkdtemp, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Simulation, type Settings } from '../src/service.js';
 import type { Inventory, Group, Thermal } from '../src/schemas.js';
 
 export const fixture = fileURLToPath(new URL('./fixtures/bar.step', import.meta.url));
 export async function temporary() {
-  const root = process.env.SIMULATION_TEST_TMP ?? '/tmp/opencode';
+  const root = process.env.SIMULATION_TEST_TMP ?? tmpdir();
   await mkdir(root, { recursive: true });
   return mkdtemp(join(root, 'simulation-test-'));
 }
 export async function service(overrides: Partial<Settings> = {}) {
   return Simulation.create({
     workspace: await temporary(), roots: [fileURLToPath(new URL('./fixtures/', import.meta.url))],
-    python: process.env.SIMULATION_PYTHON ?? 'python3', elmerGrid: process.env.SIMULATION_ELMERGRID ?? 'ElmerGrid',
+    python: process.env.SIMULATION_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3'), elmerGrid: process.env.SIMULATION_ELMERGRID ?? 'ElmerGrid',
     elmerSolver: process.env.SIMULATION_ELMERSOLVER ?? 'ElmerSolver', timeoutMs: 120000, ...overrides,
   });
 }

@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { runProcess, termination } from '../src/process.js';
 import { temporary } from './helpers.js';
 
-it('provides the home directory required by MPI without forwarding credentials', async () => {
+it('inherits the local environment and applies deterministic solver settings', async () => {
   const dir = await temporary();
   vi.stubEnv('HOME', dir);
-  vi.stubEnv('AI_GATEWAY_API_KEY', 'test-secret');
+  vi.stubEnv('SIMULATION_TEST_LOCAL_ENV', 'available');
   try {
-    const result = await runProcess(process.execPath, ['-e', 'console.log(JSON.stringify({home: process.env.HOME, secret: process.env.AI_GATEWAY_API_KEY}))'], dir, 'environment', 5000);
+    const result = await runProcess(process.execPath, ['-e', 'console.log(JSON.stringify({home: process.env.HOME, local: process.env.SIMULATION_TEST_LOCAL_ENV, lang: process.env.LANG, threads: process.env.OMP_NUM_THREADS}))'], dir, 'environment', 5000);
     expect(result.exitCode).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({ home: dir });
+    expect(JSON.parse(result.stdout)).toEqual({ home: dir, local: 'available', lang: 'C', threads: '1' });
   } finally {
     vi.unstubAllEnvs();
   }

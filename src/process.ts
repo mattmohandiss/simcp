@@ -7,10 +7,8 @@ export type ProcessResult = {
   status: 'exited' | 'timeout' | 'cancelled' | 'output_limit' | 'spawn_error';
   startedAt: string; endedAt: string; stdout: string; stderr: string;
 };
-export function controlledEnvironment(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { LANG: 'C', LC_ALL: 'C', OMP_NUM_THREADS: '1', OPENBLAS_NUM_THREADS: '1', PYTHONDONTWRITEBYTECODE: '1', OMPI_MCA_pml: 'ob1' };
-  for (const name of ['HOME', 'PATH', 'PYTHONPATH', 'LD_LIBRARY_PATH', 'ELMER_HOME', 'ELMER_LIB']) if (process.env[name]) env[name] = process.env[name];
-  return env;
+export function solverEnvironment(): NodeJS.ProcessEnv {
+  return { ...process.env, LANG: 'C', LC_ALL: 'C', OMP_NUM_THREADS: '1', OPENBLAS_NUM_THREADS: '1', PYTHONDONTWRITEBYTECODE: '1' };
 }
 function terminateTree(child: ChildProcess, force = false): void {
   if (!child.pid) return;
@@ -31,7 +29,7 @@ export async function runProcess(executable: string, args: string[], cwd: string
   let status: ProcessResult['status'] = 'exited';
   let size = 0, stdout = '', stderr = '';
   let writes = Promise.resolve();
-  const child = spawn(executable, args, { cwd, env: controlledEnvironment(), shell: false, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(executable, args, { cwd, env: solverEnvironment(), shell: false, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let killTimer: NodeJS.Timeout | undefined;
   const kill = (reason: ProcessResult['status']) => {
     if (status !== 'exited') return;

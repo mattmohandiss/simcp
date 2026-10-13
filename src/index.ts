@@ -63,7 +63,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
   const configuredRoots = z.array(z.string().min(1)).min(1).parse(roots);
   const simulation = await Simulation.create({
     workspace: resolve(process.env.SIMULATION_WORKSPACE ?? '.simulation-runs'), roots: configuredRoots,
-    python: process.env.SIMULATION_PYTHON ?? 'python3', elmerGrid: process.env.SIMULATION_ELMERGRID ?? 'ElmerGrid',
+    python: process.env.SIMULATION_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3'), elmerGrid: process.env.SIMULATION_ELMERGRID ?? 'ElmerGrid',
     elmerSolver: process.env.SIMULATION_ELMERSOLVER ?? 'ElmerSolver', timeoutMs: Number(process.env.SIMULATION_TIMEOUT_MS ?? 120000),
   });
   const handle = serveStdio(() => createServer(simulation), { legacy: 'reject' });
