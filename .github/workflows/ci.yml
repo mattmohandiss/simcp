@@ -45,7 +45,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install gcc openblas tbb ninja
-          compiler=$(node -e 'const fs=require("node:fs"); const p=process.argv[1]; const names=fs.readdirSync(p).filter(n=>/^gfortran-\\d+$/.test(n)).sort((a,b)=>Number(a.slice(9))-Number(b.slice(9))); console.log(names.length ? p+"/"+names.at(-1) : "")' "$(brew --prefix gcc)/bin")
+          compiler=$(node -e 'const fs=require("node:fs"); const p=process.argv[1]; const names=fs.readdirSync(p).filter(n=>/^gfortran-[0-9]+$/.test(n)).sort((a,b)=>Number(a.slice(9))-Number(b.slice(9))); console.log(names.length ? p+"/"+names.at(-1) : "")' "$(brew --prefix gcc)/bin")
           test -n "$compiler"
           echo "FC=$compiler" >> "$GITHUB_ENV"
           echo "CMAKE_PREFIX_PATH=$(brew --prefix openblas):$(brew --prefix tbb)" >> "$GITHUB_ENV"
@@ -65,6 +65,7 @@ jobs:
             mingw-w64-ucrt-x86_64-tbb
 
       - name: Fingerprint native runtime toolchain
+        if: runner.os != 'Windows'
         id: runtime-toolchain
         shell: bash
         run: |
@@ -76,28 +77,35 @@ jobs:
           } | tee "$RUNNER_TEMP/runtime-toolchain.txt"
           echo "fingerprint=$(sha256sum "$RUNNER_TEMP/runtime-toolchain.txt" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
+      - name: Fingerprint Windows runtime toolchain
+        if: runner.os == 'Windows'
+        id: runtime-toolchain-windows
+        shell: msys2 {0}
+        run: |
+          {
+            cmake --version | head -1
+            gfortran --version | head -1
+            pkg-config --modversion openblas || echo openblas-version-unknown
+            pkg-config --modversion tbb || echo tbb-version-unknown
+          } | tee "$RUNNER_TEMP/runtime-toolchain.txt"
+          echo "fingerprint=$(sha256sum "$RUNNER_TEMP/runtime-toolchain.txt" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
       - name: Restore native Elmer runtime cache
         id: elmer-cache
         uses: actions/cache/restore@v6
         with:
           path: .runtime-cache/elmer
-          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint }}
+          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/ci.yml', 'flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint || steps.runtime-toolchain-windows.outputs.fingerprint }}
 
       - name: Build pinned Elmer runtime on cache miss
-        if: steps.elmer-cache.outputs.cache-hit != 'true'
+        if: steps.elmer-cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
         shell: bash
-        run: |
-          rev=$(node -e 'const l=JSON.parse(require("fs").readFileSync("flake.lock")); const id=l.nodes.root.inputs.elmer; console.log(l.nodes[id].locked.rev)')
-          temp_dir="$RUNNER_TEMP"
-          workspace="$GITHUB_WORKSPACE"
-          if [[ "$RUNNER_OS" == Windows ]]; then
-            temp_dir=$(cygpath -u "$temp_dir")
-            workspace=$(cygpath -u "$workspace")
-          fi
-          git clone --filter=blob:none https://github.com/ElmerCSC/elmerfem.git "$temp_dir/elmer-source"
-          git -C "$temp_dir/elmer-source" checkout "$rev"
-          git -C "$temp_dir/elmer-source" submodule update --init --recursive
-          bash scripts/build-elmer.sh "$temp_dir/elmer-source" "$workspace/.runtime-cache/elmer"
+        run: bash scripts/ci-build-elmer.sh
+
+      - name: Build pinned Elmer runtime on Windows cache miss
+        if: steps.elmer-cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        shell: msys2 {0}
+        run: bash scripts/ci-build-elmer.sh
 
       - name: Add Elmer to PATH
         shell: bash
@@ -124,7 +132,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .runtime-cache/elmer
-          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint }}
+          key: simulation-elmer-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/ci.yml', 'flake.lock', 'scripts/build-elmer.sh') }}-${{ steps.runtime-toolchain.outputs.fingerprint || steps.runtime-toolchain-windows.outputs.fingerprint }}
 
       - name: Upload tested native Elmer runtime
         uses: actions/upload-artifact@v7
