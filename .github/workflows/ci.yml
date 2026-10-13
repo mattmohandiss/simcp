@@ -21,21 +21,19 @@ jobs:
           - name: Linux ARM64
             runner: ubuntu-24.04-arm
           - name: macOS x64
-            runner: macos-13
+            runner: macos-15-intel
           - name: macOS ARM64
             runner: macos-14
           - name: Windows x64
             runner: windows-2022
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
+      - uses: astral-sh/setup-uv@v10
       - run: npm ci --ignore-scripts
       - run: uvx ruff check worker
       - run: npm run typecheck
@@ -45,11 +43,11 @@ jobs:
   linux-solver-integration:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
