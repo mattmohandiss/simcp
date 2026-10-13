@@ -12,6 +12,12 @@ passed locally. This is local runtime evidence, not verification of every target
 
 ## Install and launch
 
+Distribution targets match Geometry MCP: Windows x64, macOS ARM64 (Apple
+Silicon), and Linux x64. Intel macOS, Linux ARM64, and Windows ARM64 are outside
+the target matrix. CI runs unit/artifact/process checks on these three targets;
+full solver integration currently runs only on Linux x64. Bundled cross-platform
+solver runtimes are still under development.
+
 The repository owns its artifact schema in `contracts/`. Builds bundle that
 schema and the Python worker; Gmsh and Elmer runtimes are installed separately.
 
@@ -32,7 +38,7 @@ just start
 pins nixpkgs (and thus Gmsh) by commit, and pins upstream Elmer by commit.
 Elmer's transitive inputs use its checked-in lock.
 
-Nix provisions the solver toolchain only on x86_64-linux and aarch64-linux.
+Nix provisions the solver toolchain only on x86_64-linux.
 `packages.<system>.toolchain` provisions Node, Gmsh, the Python wrapper and
 headless upstream Elmer built serially without MPI, OpenMP, ElmerIce or Lua. The analytic
 thermal benchmark passes with that serial solver. The dev shell also provisions
