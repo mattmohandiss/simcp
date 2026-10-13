@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-func fileIdentity(info os.FileInfo) (string, string, error) {
+func fileIdentity(_ string, info os.FileInfo) (string, string, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return "", "", fmt.Errorf("unsupported Unix file identity")

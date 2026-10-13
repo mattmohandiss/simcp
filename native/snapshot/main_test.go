@@ -83,7 +83,7 @@ func TestSnapshotRejectsReplacedRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	device, inode, err := fileIdentity(info)
+	device, inode, err := fileIdentity(root, info)
 	if err != nil {
 		t.Skipf("root identity unavailable: %v", err)
 	}

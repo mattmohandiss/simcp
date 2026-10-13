@@ -108,7 +108,7 @@ func sameRoot(info os.FileInfo, spec rootSpec) bool {
 	if spec.Device == "" && spec.Inode == "" {
 		return true
 	}
-	device, inode, err := fileIdentity(info)
+	device, inode, err := fileIdentity(spec.Path, info)
 	return err == nil && device == spec.Device && inode == spec.Inode
 }
 
