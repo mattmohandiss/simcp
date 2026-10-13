@@ -8,7 +8,7 @@ export type ProcessResult = {
   startedAt: string; endedAt: string; stdout: string; stderr: string;
 };
 export function controlledEnvironment(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { LANG: 'C', LC_ALL: 'C', OMP_NUM_THREADS: '1', OPENBLAS_NUM_THREADS: '1', PYTHONDONTWRITEBYTECODE: '1' };
+  const env: NodeJS.ProcessEnv = { LANG: 'C', LC_ALL: 'C', OMP_NUM_THREADS: '1', OPENBLAS_NUM_THREADS: '1', PYTHONDONTWRITEBYTECODE: '1', OMPI_MCA_pml: 'ob1' };
   for (const name of ['HOME', 'PATH', 'PYTHONPATH', 'LD_LIBRARY_PATH', 'ELMER_HOME', 'ELMER_LIB']) if (process.env[name]) env[name] = process.env[name];
   return env;
 }
