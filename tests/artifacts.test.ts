@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { Artifacts, digest } from '../src/artifacts.js';
 import { temporary } from './helpers.js';
 
-it('snapshots only regular files within configured roots', async () => {
+it('limits inputs to configured local roots', async () => {
   const root = await temporary(), outside = await temporary();
   const path = join(root, 'part.step');
   await writeFile(path, 'allowed');
@@ -18,6 +18,7 @@ it('snapshots only regular files within configured roots', async () => {
   await mkdir(nested);
   await symlink(outside, join(nested, 'escape'));
   await expect(artifacts.bytes(pathToFileURL(join(nested, 'escape', 'secret.step')).href)).rejects.toMatchObject({ code: 'path_policy' });
+  await expect(artifacts.bytes(pathToFileURL(root).href)).rejects.toMatchObject({ code: 'path_policy' });
 });
 
 it('rejects an artifact whose exact-byte revision changed', async () => {

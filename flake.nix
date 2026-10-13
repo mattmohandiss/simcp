@@ -29,13 +29,13 @@
       devShells = eachSystem (system:
         let t = toolsFor system; in {
           checks = t.pkgs.mkShell {
-            packages = with t.pkgs; [ just nodejs_24 python3 ruff nixpkgs-fmt go ];
+            packages = with t.pkgs; [ just nodejs_24 python3 ruff nixpkgs-fmt ];
             shellHook = ''
               export PATH="$PWD/node_modules/.bin:$PATH"
             '';
           };
           default = t.pkgs.mkShell {
-            packages = with t.pkgs; [ just nodejs_24 python3 gmsh ruff nil nixpkgs-fmt go ] ++ [ t.python t.solver ];
+            packages = with t.pkgs; [ just nodejs_24 python3 gmsh ruff nil nixpkgs-fmt ] ++ [ t.python t.solver ];
             shellHook = ''
               export PATH="$PWD/node_modules/.bin:$PATH"
               export PYTHONPATH="${t.pkgs.gmsh}/lib''${PYTHONPATH:+:$PYTHONPATH}"

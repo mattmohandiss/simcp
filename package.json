@@ -12,7 +12,6 @@
   "files": [
     "dist/src",
     "dist/contracts",
-    "dist/native",
     "dist/worker/*.py",
     "!dist/**/*.map",
     "README.md",
@@ -20,13 +19,11 @@
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "rm -rf dist && tsc && node scripts/copy-assets.mjs && node scripts/build-native.mjs",
+    "build": "node scripts/clean-dist.mjs && tsc && node scripts/copy-assets.mjs",
     "prepack": "npm run build",
-    "pretest": "node scripts/build-native.mjs --host-only",
-    "pretest:integration": "node scripts/build-native.mjs --host-only",
     "start": "node dist/src/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/unit.test.ts tests/security.test.ts tests/process.test.ts",
+    "test": "vitest run tests/unit.test.ts tests/artifacts.test.ts tests/process.test.ts",
     "test:integration": "vitest run tests/integration.test.ts",
     "lint": "oxlint src tests",
     "fmt": "prettier --write src tests scripts package.json tsconfig.json"

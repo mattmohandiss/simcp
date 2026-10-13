@@ -7,14 +7,13 @@ worker uses a one-request/one-response JSON-file protocol (`protocol: 1`).
 No other MCP service, cloud service or prepared SIF is required.
 
 **Local validation (2026-10-13):** Nix Gmsh 4.15.0 and Elmer 26.2 completed the
-analytic thermal benchmark. The unit/security/process suite and native integration
-tests passed. This is local runtime evidence, not verification of every target platform.
+analytic thermal benchmark. Unit, artifact, process, and thermal integration tests
+passed locally. This is local runtime evidence, not verification of every target platform.
 
 ## Install and launch
 
 The repository owns its artifact schema in `contracts/`. Builds bundle that
-schema, the Python worker, and native rooted-snapshot helpers for the five
-Geometry OS/CPU targets; Gmsh and Elmer runtimes are installed separately.
+schema and the Python worker; Gmsh and Elmer runtimes are installed separately.
 
 From this directory:
 
@@ -33,15 +32,9 @@ just start
 pins nixpkgs (and thus Gmsh) by commit, and pins upstream Elmer by commit.
 Elmer's transitive inputs use its checked-in lock.
 
-Artifact snapshots use Go `os.Root` and are enabled on Linux and macOS. Windows
-workspace ACL verification is not implemented yet, so server startup remains
-fail-closed there. The Windows snapshot helper is cross-built/tested but is not
-yet wired into a supported Windows server configuration.
 Nix provisions the solver toolchain only on x86_64-linux and aarch64-linux.
-The cross-platform native helper is built into the npm artifact for Linux x64/ARM64,
-macOS x64/ARM64, and Windows x64; this does not imply native solver support on all targets.
 `packages.<system>.toolchain` provisions Node, Gmsh, the Python wrapper and
-upstream Elmer. The dev shell also provisions Go, Python, Ruff and Nix tooling;
+upstream Elmer. The dev shell also provisions Python, Ruff and Nix tooling;
 TypeScript language server/formatter/linter/test deps are project-local npm
 dependencies. Gmsh's Python module lives under its Nix package's `lib`, supplied
 through `PYTHONPATH`. Elmer is an external package, not compiled by npm.
@@ -53,7 +46,7 @@ library plus `ElmerGrid` and `ElmerSolver` with `HeatSolve`, `FluxSolver`,
 | Variable                 | Default / meaning                                    |
 | ------------------------ | ---------------------------------------------------- |
 | `SIMULATION_INPUT_ROOTS` | Required JSON array of existing absolute input roots |
-| `SIMULATION_WORKSPACE`   | `.simulation-runs`; owned by server user, mode 0700  |
+| `SIMULATION_WORKSPACE`   | `.simulation-runs`; local run/artifact storage      |
 | `SIMULATION_PYTHON`      | `python3`; Nix sets its provisioned wrapper          |
 | `SIMULATION_ELMERGRID`   | `ElmerGrid`                                          |
 | `SIMULATION_ELMERSOLVER` | `ElmerSolver`                                        |
@@ -78,7 +71,7 @@ the Nix shell):
 
 ## Staged tools
 
-1. `inspect_source({uri})` or `inspect_source({source: ArtifactRef})` snapshots
+1. `inspect_source({uri})` or `inspect_source({source: ArtifactRef})` reads
    exact STEP bytes. It returns `source`, revisioned `inspection`, inventory and
    logs. Supported STEP SI length units are m/mm/cm/µm; mixed, missing or
    unsupported length units fail explicitly. Gmsh OCC targets meters and retains
@@ -149,13 +142,12 @@ metadata rather than disguising partial outputs as successful results.
 
 ## Boundaries, security and retention
 
-- `file:` only; roots are canonicalized, traversal/remote URIs rejected,
-  regular-file descriptors checked after opening, and bytes read twice with
-  metadata/digest checks before immutable snapshots. A ref does not grant access.
-- Workspace is trusted private local storage owned by the service user. Do not
-  share it with concurrent server instances or untrusted same-UID writers.
-  Exact snapshots protect analysis from caller source mutation. Reusing stale
-  source, inventory, mesh, case or successful output refs fails explicitly.
+- This is a trusted-local tool, not a filesystem sandbox. Input roots are
+  canonicalized and used to catch accidental path mistakes; the server assumes
+  the local user and files are trusted. Do not expose it to untrusted clients.
+- Artifact revisions are SHA-256 digests of the exact bytes read or produced.
+  Reusing a ref after its file changes fails explicitly, but concurrent edits
+  during an operation are not defended against.
 - Processes use configured executables and argument arrays, no shell; only
   HOME/PATH/PYTHONPATH/library/Elmer paths are inherited, plus fixed locale/thread
   settings. No secrets or general application environment is forwarded.
@@ -173,7 +165,9 @@ metadata rather than disguising partial outputs as successful results.
   removes only compiled code. Interrupted records are not resumed. After an
   ungraceful termination inspect/reap any orphaned solver processes before
   restarting against that workspace. Graceful shutdown cancels owned runs.
-- These outputs are numerical evidence, not engineering certification.
+- Hosted deployments need an external isolation boundary (e.g. a container or VM
+  with explicit input mounts and resource limits); application path checks are
+  not a substitute. These outputs are numerical evidence, not engineering certification.
 
 ## Implementation choices
 

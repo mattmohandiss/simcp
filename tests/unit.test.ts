@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmod, mkdir, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Artifacts, digest } from '../src/artifacts.js';
@@ -21,7 +21,7 @@ describe('artifact inputs and exact bytes', () => {
     expect(digest('abc')).toBe('sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
     expect(digest('abc\n')).not.toBe(digest('abc'));
   });
-  it('rejects stale data, escapes, traversal and directories; immutable snapshots survive locator changes', async () => {
+  it('rejects stale data, paths outside configured roots, traversal and directories', async () => {
     const workspace = await temporary(), input = await temporary(), outside = await temporary();
     const artifacts = await Artifacts.create(workspace, [input]);
     const source = join(input, 'input.step');
@@ -40,8 +40,6 @@ describe('artifact inputs and exact bytes', () => {
     await mkdir(join(input, 'linked'));
     await symlink(outside, join(input, 'linked', 'parent'));
     await expect(artifacts.bytes(pathToFileURL(join(input, 'linked', 'parent', 'secret')).href)).rejects.toMatchObject({ code: 'path_policy' });
-    await chmod(workspace, 0o755);
-    await expect(Artifacts.create(workspace, [input])).rejects.toMatchObject({ code: 'path_policy' });
   });
 });
 

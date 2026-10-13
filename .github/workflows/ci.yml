@@ -33,10 +33,6 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.26.x'
-          cache-dependency-path: native/snapshot/go.mod
       - uses: astral-sh/setup-uv@v10.3.0
       - run: npm ci --ignore-scripts
       - run: npm run build
@@ -44,8 +40,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npx vitest run tests/process.test.ts
-      - run: go test ./...
-        working-directory: native/snapshot
       - uses: cachix/install-nix-action@v31
         if: matrix.name == 'Linux x64'
         with:
