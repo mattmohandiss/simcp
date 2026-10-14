@@ -144,6 +144,19 @@ jobs:
           SIMULATION_ELMERSOLVER: ${{ runner.os == 'Windows' && format('{0}/.runtime-cache/elmer/bin/ElmerSolver.exe', github.workspace) || format('{0}/.runtime-cache/elmer/bin/ElmerSolver', github.workspace) }}
         run: npm run test:integration
 
+      - name: Pack and install the published package
+        run: |
+          npm pack --pack-destination .
+          npm install --prefix smoke --no-save --ignore-scripts ./simulation-mcp-server-0.1.0.tgz
+
+      - name: Launch packed MCP server and inspect STEP fixture
+        env:
+          SIMULATION_SMOKE_ROOT: smoke
+          SIMULATION_PYTHON: python
+          SIMULATION_ELMERGRID: ${{ runner.os == 'Windows' && format('{0}/.runtime-cache/elmer/bin/ElmerGrid.exe', github.workspace) || format('{0}/.runtime-cache/elmer/bin/ElmerGrid', github.workspace) }}
+          SIMULATION_ELMERSOLVER: ${{ runner.os == 'Windows' && format('{0}/.runtime-cache/elmer/bin/ElmerSolver.exe', github.workspace) || format('{0}/.runtime-cache/elmer/bin/ElmerSolver', github.workspace) }}
+        run: node scripts/smoke-packed-mcp.mjs
+
       - name: Save native Elmer runtime cache
         if: steps.elmer-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
