@@ -2,7 +2,7 @@ import { mkdtemp, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { Simulation, type Settings } from '../src/service.js';
+import { Simulation, type ServiceOptions, type Settings } from '../src/service.js';
 import type { Inventory, Group, Thermal } from '../src/schemas.js';
 
 export const fixture = fileURLToPath(new URL('./fixtures/bar.step', import.meta.url));
@@ -11,12 +11,12 @@ export async function temporary() {
   await mkdir(root, { recursive: true });
   return mkdtemp(join(root, 'simulation-test-'));
 }
-export async function service(overrides: Partial<Settings> = {}) {
+export async function service(overrides: Partial<Settings> = {}, options: ServiceOptions = {}) {
   return Simulation.create({
     workspace: await temporary(), roots: [fileURLToPath(new URL('./fixtures/', import.meta.url))],
     python: process.env.SIMULATION_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3'), elmerGrid: process.env.SIMULATION_ELMERGRID ?? 'ElmerGrid',
     elmerSolver: process.env.SIMULATION_ELMERSOLVER ?? 'ElmerSolver', timeoutMs: 120000, ...overrides,
-  });
+  }, options);
 }
 // Benchmark-specific engineering selections: the production service never
 // guesses these. The test explicitly checks geometry before using the policy.

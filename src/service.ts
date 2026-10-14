@@ -29,12 +29,13 @@ export const runSchema = z.strictObject({
 });
 export type Run = z.infer<typeof runSchema>;
 export type Settings = { workspace: string; roots: string[]; python: string; elmerGrid: string; elmerSolver: string; timeoutMs: number };
+export type ServiceOptions = { solverRunner?: typeof runProcess };
 export class Simulation {
   private active = new Map<string, { abort: AbortController; done: Promise<void>; state: Run }>();
-  private constructor(public artifacts: Artifacts, public settings: Settings) {}
-  static async create(settings: Settings) {
+  private constructor(public artifacts: Artifacts, public settings: Settings, private solverRunner: typeof runProcess) {}
+  static async create(settings: Settings, options: ServiceOptions = {}) {
     requireThat(Number.isInteger(settings.timeoutMs) && settings.timeoutMs > 0 && settings.timeoutMs <= 3_600_000, 'invalid_input', 'Timeout must be between 1 and 3600000 ms.');
-    return new Simulation(await Artifacts.create(settings.workspace, settings.roots), settings);
+    return new Simulation(await Artifacts.create(settings.workspace, settings.roots), settings, options.solverRunner ?? runProcess);
   }
   async logs(dir: string, prefix: string) {
     return Promise.all(['stdout', 'stderr'].map(suffix => this.artifacts.capture(join(dir, `${prefix}.${suffix}`), 'text')));
@@ -164,7 +165,7 @@ export class Simulation {
       await this.loadMesh(document.mesh);
       state.status = 'running'; state.startedAt = new Date().toISOString();
       await this.persist(dir, state);
-      const result = await runProcess(this.settings.elmerSolver, ['case.sif'], dir, 'solver', this.settings.timeoutMs, signal);
+      const result = await this.solverRunner(this.settings.elmerSolver, ['case.sif'], dir, 'solver', this.settings.timeoutMs, signal);
       state.logs = await this.logs(dir, 'solver');
       state.solver.version = version(result, 'ElmerSolver');
       state.execution = { exitCode: result.exitCode, signal: result.signal, termination: result.status, timeoutMs: this.settings.timeoutMs };

@@ -11,9 +11,30 @@ import {
   temporary,
 } from "./helpers.js";
 import { Simulation } from "../src/service.js";
+import { runProcess, type ProcessResult } from "../src/process.js";
 
 it("completes STEP → explicit groups → native mesh → SIF → Elmer → analytic thermal results", async () => {
-  const simulation = await service();
+  let solverBehavior: "real" | "missing" | "no-output" | "failed" | "timeout" | "cancelled" = "real";
+  const solverRunner = async (executable: string, args: string[], cwd: string, prefix: string, timeoutMs: number, signal?: AbortSignal): Promise<ProcessResult> => {
+    if (solverBehavior === "real") return runProcess(executable, args, cwd, prefix, timeoutMs, signal);
+    await writeFile(join(cwd, `${prefix}.stdout`), "");
+    await writeFile(join(cwd, `${prefix}.stderr`), "");
+    const startedAt = new Date().toISOString();
+    const result = (status: ProcessResult["status"], exitCode: number | null): ProcessResult => ({
+      status, exitCode, signal: null, startedAt, endedAt: new Date().toISOString(), stdout: "", stderr: "",
+    });
+    if (solverBehavior === "missing") return result("spawn_error", null);
+    if (solverBehavior === "no-output") return result("exited", 0);
+    if (solverBehavior === "failed") return { ...result("exited", 9), stderr: "ERROR: forced failure" };
+    if (solverBehavior === "timeout") return result("timeout", null);
+    if (solverBehavior === "cancelled") {
+      if (signal?.aborted) return result("cancelled", null);
+      await new Promise<void>(resolve => signal?.addEventListener("abort", () => resolve(), { once: true }));
+      return result("cancelled", null);
+    }
+    throw new Error("Unexpected solver behavior");
+  };
+  const simulation = await service({}, { solverRunner });
   try {
     const inspected = await simulation.inspect({
       uri: pathToFileURL(fixture).href,
@@ -100,7 +121,7 @@ it("completes STEP → explicit groups → native mesh → SIF → Elmer → ana
     const restarted = await Simulation.create(simulation.settings);
     expect((await restarted.status(run.runId)).status).toBe("succeeded");
 
-    simulation.settings.elmerSolver = "/nonexistent-ElmerSolver";
+    solverBehavior = "missing";
     const missing = await waitForRun(
       simulation,
       (await simulation.start(configured.case)).runId,
@@ -110,30 +131,21 @@ it("completes STEP → explicit groups → native mesh → SIF → Elmer → ana
     expect(missing.logs).toHaveLength(2);
     expect((await simulation.status(run.runId)).status).toBe("succeeded");
 
-    const fake = join(await temporary(), "fake-solver.mjs");
-    await writeFile(
-      fake,
-      `#!${process.execPath}\nconsole.log('ElmerSolver test double');\n`,
-      { mode: 0o700 },
-    );
-    simulation.settings.elmerSolver = fake;
+    solverBehavior = "no-output";
     const noOutput = await waitForRun(
       simulation,
       (await simulation.start(configured.case)).runId,
     );
     expect(noOutput.status).toBe("failed");
     expect(noOutput.error?.code).toBe("malformed_results");
-    await writeFile(
-      fake,
-      `#!${process.execPath}\nconsole.error('ERROR: forced failure');process.exit(9);\n`,
-    );
+    solverBehavior = "failed";
     const solverError = await waitForRun(
       simulation,
       (await simulation.start(configured.case)).runId,
     );
     expect(solverError.execution?.exitCode).toBe(9);
     expect(solverError.status).toBe("failed");
-    await writeFile(fake, `#!${process.execPath}\nsetInterval(()=>{},1000);\n`);
+    solverBehavior = "timeout";
     simulation.settings.timeoutMs = 50;
     const timedOut = await waitForRun(
       simulation,
@@ -141,6 +153,7 @@ it("completes STEP → explicit groups → native mesh → SIF → Elmer → ana
     );
     expect(timedOut.status).toBe("timeout");
     simulation.settings.timeoutMs = 120000;
+    solverBehavior = "cancelled";
     const cancelled = await simulation.start(configured.case);
     expect((await simulation.cancel(cancelled.runId)).status).toBe("cancelled");
 
