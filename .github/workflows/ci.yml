@@ -123,6 +123,11 @@ jobs:
         shell: bash
         run: echo "$GITHUB_WORKSPACE/.runtime-cache/elmer/bin" >> "$GITHUB_PATH"
 
+      - name: Add MSYS2 runtime DLLs to PATH
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: echo "$(cygpath -w "$MINGW_PREFIX/bin")" >> "$(cygpath -u "$GITHUB_PATH")"
+
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
